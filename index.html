@@ -4,6 +4,24 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Fengaros 2026 — audition &amp; plan</title>
+
+<script>
+  // Cookieless analytics (GoatCounter): no cookies, no cross-site tracking, no
+  // consent banner required. Path is pinned to the pathname so share links —
+  // whose fragment encodes someone's ratings — never leave the browser.
+  window.goatcounter = { path: () => location.pathname };
+
+  // count.js loads async, so anything counted during page setup waits here.
+  const gcPending = [];
+  function track(name) {
+    if (window.goatcounter.count) window.goatcounter.count({ path: name, title: name, event: true });
+    else gcPending.push(name);
+  }
+  function gcFlush() { gcPending.splice(0).forEach(track); }
+</script>
+<script data-goatcounter="https://prodoelmit-fengaros-lineup-2026.goatcounter.com/count"
+        async src="//gc.zgo.at/count.js" onload="gcFlush()"></script>
+
 <style>
   :root {
     --bg: #14121a; --panel: #1d1a26; --panel2: #262233; --line: #35304a;
@@ -501,6 +519,7 @@ function exportICS() {
   a.href = URL.createObjectURL(blob);
   a.download = 'fengaros-2026.ics';
   a.click();
+  track('calendar-export');
 }
 
 // --- Sharing -------------------------------------------------------------
@@ -582,6 +601,7 @@ function decodeShared(hash) {
 function shareChoices() {
   const rated = Object.keys(PICKS).length;
   if (!rated) { alert('Nothing scored yet — score a few acts first.'); return; }
+  track('share-link');
   const url = location.origin + location.pathname + encodeState();
   const b = document.getElementById('sharebtn');
   const done = () => {
@@ -633,6 +653,7 @@ document.getElementById('layout').onchange = e => {
 
 // A shared link opens read-only; it never overwrites what this browser has stored.
 if (typeof location !== 'undefined' && location.hash) shared = decodeShared(location.hash);
+if (shared) track('shared-link-open');
 document.getElementById('resetbtn').onclick = () => {
   if (confirm('Clear all your ratings?')) { for (const k in PICKS) delete PICKS[k]; savePicks(); render(); }
 };

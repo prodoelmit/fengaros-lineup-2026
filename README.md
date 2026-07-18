@@ -18,8 +18,8 @@ lineup: listen to every act, rate them, and get a stage-by-stage itinerary out t
 - **Audition the lineup.** Each act has an inline Spotify or YouTube player where a verified
   one exists, plus YouTube / Spotify / Bandcamp search links for everyone else. Roughly half
   the bill is DJs and first-release bands with no streaming presence, so the gaps are expected.
-- **Score each act 0–5** (5 = must see, 0 = no). Scores live in `localStorage`;
-  nothing is sent anywhere.
+- **Score each act 0–5** (5 = must see, 0 = no). Scores live in `localStorage`
+  and are never sent anywhere — see [Analytics](#analytics) for the one thing that is.
 - **Share a plan.** "Share my choices" packs every score into the URL fragment —
   one character per set, so the link is self-contained and needs no backend.
   Opening someone's link offers to load their scores over yours.
@@ -33,6 +33,23 @@ listening, then raise the threshold if the result is overstuffed.
 
 On phones, Spotify and YouTube links hand off to the native apps via their custom URL
 schemes rather than opening the mobile web players.
+
+## Analytics
+
+Pageviews are counted with [GoatCounter](https://www.goatcounter.com/) — no cookies, no
+cross-site tracking, no advertising network, and no consent banner required under EU rules.
+Three interactions are counted as anonymous events: creating a share link, exporting `.ics`,
+and opening someone else's shared link.
+
+The counted path is pinned to `location.pathname`, so the URL fragment — which is where a
+share link carries someone's ratings — is never transmitted. Ratings themselves stay in
+`localStorage` and are never sent.
+
+Counting is skipped on `localhost`, so local development never pollutes the stats. To point
+this at a different instance, change the `data-goatcounter` attribute at the top of
+`index.html`. To opt out entirely, delete the
+`gc.zgo.at/count.js` tag but keep the one above it — that first tag defines `track()`, which
+the share and export handlers call; without the loader it simply becomes a no-op.
 
 ## Running it
 
