@@ -16,6 +16,11 @@
   header { padding: 20px 24px 12px; border-bottom: 1px solid var(--line); }
   h1 { margin: 0 0 4px; font-size: 22px; letter-spacing: .5px; }
   .sub { color: var(--dim); font-size: 13px; }
+  .disclaimer { padding: 10px 24px; background: #241f14; border-bottom: 1px solid var(--line);
+                color: var(--dim); font-size: 12.5px; line-height: 1.55; }
+  .disclaimer b { color: var(--fg); font-weight: 600; }
+  .disclaimer a { color: var(--accent); }
+  .disclaimer .by { display: inline-block; margin-left: 4px; opacity: .8; }
   .bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 12px 24px;
          border-bottom: 1px solid var(--line); position: sticky; top: 0; background: var(--bg); z-index: 20; }
   button, select { font: inherit; color: var(--fg); background: var(--panel2);
@@ -76,6 +81,14 @@
   <h1>Fengaros Festival 2026</h1>
   <div class="sub">Petrides Farm Park, Marki, Cyprus &middot; 30 July &ndash; 1 August &middot; audition the lineup, then build a stage-hopping plan</div>
 </header>
+
+<div class="disclaimer">
+  <b>Unofficial fan-made planner.</b> Not affiliated with or endorsed by Fengaros Festival.
+  Schedule reflects the lineup as published on <b>18 July 2026</b> and may since have changed &mdash;
+  always check the <a href="https://www.fengaros.com/lineup" target="_blank" rel="noopener">official lineup</a>
+  before making plans.
+  <span class="by">Vibe-coded by <a href="https://linkedin.com/in/prodoelmit" target="_blank" rel="noopener">prodoelmit</a>.</span>
+</div>
 
 <div class="bar">
   <span id="daytabs"></span>

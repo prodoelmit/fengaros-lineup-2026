@@ -1,9 +1,17 @@
 # Fengaros 2026 — audition & plan
 
+**→ [prodoelmit.github.io/fengaros-lineup-2026](https://prodoelmit.github.io/fengaros-lineup-2026/)**
+
 A single-page tool for working through the [Fengaros Festival 2026](https://www.fengaros.com/)
 lineup: listen to every act, rate them, and get a stage-by-stage itinerary out the other end.
 
 **Petrides Farm Park, Marki, Cyprus · 30 July – 1 August 2026 · 6 stages · 70 slots**
+
+> **Unofficial fan-made planner.** Not affiliated with or endorsed by Fengaros Festival.
+> The schedule here reflects the lineup as published on **18 July 2026** and may since have
+> changed — always check the [official lineup](https://www.fengaros.com/lineup) before making plans.
+>
+> Vibe-coded by [prodoelmit](https://linkedin.com/in/prodoelmit).
 
 ## What it does
 
