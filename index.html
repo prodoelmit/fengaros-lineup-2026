@@ -1,0 +1,371 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fengaros 2026 — audition &amp; plan</title>
+<style>
+  :root {
+    --bg: #14121a; --panel: #1d1a26; --panel2: #262233; --line: #35304a;
+    --fg: #ece9f5; --dim: #a09ab8; --accent: #ffcf5c;
+    --yes: #4ade80; --maybe: #fbbf24;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--fg);
+         font: 15px/1.5 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; }
+  header { padding: 20px 24px 12px; border-bottom: 1px solid var(--line); }
+  h1 { margin: 0 0 4px; font-size: 22px; letter-spacing: .5px; }
+  .sub { color: var(--dim); font-size: 13px; }
+  .bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 12px 24px;
+         border-bottom: 1px solid var(--line); position: sticky; top: 0; background: var(--bg); z-index: 20; }
+  button, select { font: inherit; color: var(--fg); background: var(--panel2);
+                   border: 1px solid var(--line); border-radius: 8px; padding: 6px 12px; cursor: pointer; }
+  button:hover { border-color: var(--accent); }
+  button.on { background: var(--accent); color: #241f10; border-color: var(--accent); font-weight: 600; }
+  .spacer { flex: 1; }
+  .thr { color: var(--dim); font-size: 12.5px; display: flex; align-items: center; gap: 6px; }
+  main { padding: 20px 24px 80px; }
+
+  .stage-group { margin-bottom: 28px; }
+  .stage-head { display: flex; align-items: center; gap: 10px; margin: 0 0 10px; font-size: 15px;
+                text-transform: uppercase; letter-spacing: 1.5px; }
+  .dot { width: 11px; height: 11px; border-radius: 50%; flex: none; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px; }
+
+  .card { background: var(--panel); border: 1px solid var(--line); border-left-width: 4px;
+          border-radius: 10px; padding: 12px 14px; }
+  .card.r4 { border-color: var(--yes); background: #17281d; }
+  .card.r3 { border-color: #86c98d; background: #1b241d; }
+  .card.r2 { border-color: var(--maybe); background: #241f14; }
+  .card.r1 { opacity: .62; }
+  .card.r0 { opacity: .38; }
+  .card-top { display: flex; gap: 10px; align-items: baseline; }
+  .time { font-variant-numeric: tabular-nums; font-weight: 700; color: var(--accent); font-size: 15px; }
+  .name { font-weight: 600; flex: 1; }
+  .flag { font-size: 11px; color: var(--dim); border: 1px solid var(--line); border-radius: 4px; padding: 1px 5px; }
+  .genre { color: var(--dim); font-size: 13px; margin-top: 3px; }
+  .note { color: var(--dim); font-size: 12px; margin-top: 5px; font-style: italic; }
+  .lowconf { color: #f0a; font-size: 11px; margin-top: 4px; }
+  .listen, .vote { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  .listen { margin-top: 10px; }
+  .vote { margin-top: 11px; padding-top: 10px; border-top: 1px dashed var(--line); }
+  .sect { font-size: 10.5px; text-transform: uppercase; letter-spacing: 1.2px;
+          color: var(--dim); margin-right: 3px; }
+  .listen button, .listen a, .vote button { font-size: 12px; padding: 4px 9px; border-radius: 6px;
+      border: 1px solid var(--line); background: var(--panel2); color: var(--dim);
+      text-decoration: none; cursor: pointer; }
+  .listen a:hover, .listen button:hover, .vote button:hover { color: var(--fg); border-color: var(--accent); }
+  /* Must out-specify `.vote button` above, or the highlight silently loses. */
+  .vote button.on { background: var(--accent); color: #241f10; border-color: var(--accent); font-weight: 600; }
+  .player { margin-top: 10px; }
+  .player iframe { width: 100%; border: 0; border-radius: 8px; display: block; }
+
+  table.plan { border-collapse: collapse; width: 100%; max-width: 900px; }
+  table.plan td, table.plan th { padding: 7px 10px; border-bottom: 1px solid var(--line);
+      vertical-align: top; text-align: left; }
+  table.plan th { color: var(--dim); font-weight: 500; font-size: 12px; text-transform: uppercase;
+      letter-spacing: 1px; }
+  tr.walk td { color: var(--dim); font-size: 12.5px; font-style: italic; }
+  tr.clash td { color: #ff8080; font-size: 12.5px; }
+  .empty { color: var(--dim); padding: 30px 0; }
+  .legend { color: var(--dim); font-size: 12.5px; margin-bottom: 16px; max-width: 780px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Fengaros Festival 2026</h1>
+  <div class="sub">Petrides Farm Park, Marki, Cyprus &middot; 30 July &ndash; 1 August &middot; audition the lineup, then build a stage-hopping plan</div>
+</header>
+
+<div class="bar">
+  <span id="daytabs"></span>
+  <span class="spacer"></span>
+  <select id="filter">
+    <option value="all">Show all</option>
+    <option value="picked">Only acts in my plan</option>
+    <option value="unheard">Not yet rated</option>
+  </select>
+  <label class="thr">plan includes
+    <select id="threshold">
+      <option value="4">must see</option>
+      <option value="3" selected>probably yes &amp; up</option>
+      <option value="2">indifferent &amp; up</option>
+      <option value="1">probably no &amp; up</option>
+    </select>
+  </label>
+  <button id="planbtn">My plan</button>
+  <button id="icsbtn">Export .ics</button>
+  <button id="resetbtn">Reset picks</button>
+</div>
+
+<main id="main"></main>
+
+<script src="schedule.js"></script>
+<script>
+// 4 = must see … 0 = no. Higher wins when two sets clash.
+const LEVELS = [
+  { v: 4, label: '★★ Must see',    short: 'must see' },
+  { v: 3, label: '★ Probably yes', short: 'probably yes' },
+  { v: 2, label: '~ Indifferent',  short: 'indifferent' },
+  { v: 1, label: '· Probably no',  short: 'probably no' },
+  { v: 0, label: '✕ No',           short: 'no' },
+];
+const labelOf = v => (LEVELS.find(l => l.v === v) || {}).short || '';
+
+const PICKS = JSON.parse(localStorage.getItem('fengaros26') || '{}');
+// Migrate the original 3-point scale (yes/maybe/no strings) onto the 0-4 scale.
+for (const k in PICKS) {
+  if (typeof PICKS[k] === 'string') PICKS[k] = { yes: 4, maybe: 2, no: 0 }[PICKS[k]] ?? 2;
+}
+const savePicks = () => localStorage.setItem('fengaros26', JSON.stringify(PICKS));
+
+// Only sets rated at or above this go in the plan.
+let threshold = +(localStorage.getItem('fengaros26_thr') ?? 3);
+
+const stageById = Object.fromEntries(STAGES.map(s => [s.id, s]));
+const dayById = Object.fromEntries(DAYS.map(d => [d.id, d]));
+const key = s => `${s.day}|${s.t}|${s.a}`;
+
+// A set listed at e.g. 0020 on Thursday actually happens early Friday morning.
+function startDate(s) {
+  const [y, m, d] = dayById[s.day].iso.split('-').map(Number);
+  const hh = +s.t.slice(0, 2), mm = +s.t.slice(2);
+  const dt = new Date(y, m - 1, d, hh, mm);
+  if (hh < 6) dt.setDate(dt.getDate() + 1);
+  return dt;
+}
+const endDate = s => new Date(startDate(s).getTime() + SET_MINUTES * 60000);
+const hhmm = dt => String(dt.getHours()).padStart(2, '0') + ':' + String(dt.getMinutes()).padStart(2, '0');
+
+let curDay = 'thu', curView = 'browse';
+
+// One link per platform: straight to the artist where we have them, a search otherwise.
+function outLinks(name, L) {
+  const n = encodeURIComponent(name), q = encodeURIComponent(name + ' music');
+  const links = [
+    ['Spotify ↗', L.spotify_artist_id
+      ? `https://open.spotify.com/artist/${L.spotify_artist_id}`
+      : `https://open.spotify.com/search/${n}`],
+    ['YouTube ↗', L.youtube_video_id ? `https://youtu.be/${L.youtube_video_id}`
+      : L.youtube_channel || `https://www.youtube.com/results?search_query=${q}`],
+    ['Bandcamp ↗', L.bandcamp_url || `https://bandcamp.com/search?q=${n}`],
+  ];
+  if (L.homepage) links.push(['Bio ↗', L.homepage]);
+  return links;
+}
+
+function renderCard(s) {
+  const L = LINKS[s.a] || {};
+  const k = key(s), pick = PICKS[k];
+  const st = stageById[s.stage];
+  const el = document.createElement('div');
+  el.className = 'card' + (pick === undefined ? '' : ' r' + pick);
+  el.style.borderLeftColor = st.color;
+
+  const flag = s.c ? `<span class="flag">${s.c}</span>` : '';
+  const genre = L.genre ? `<div class="genre">${L.genre}</div>` : (s.talk ? '<div class="genre">talk / comedy</div>' : '');
+  const note = L.note ? `<div class="note">${L.note}</div>` : '';
+  const warn = L.confidence === 'low' ? '<div class="lowconf">link may be a different act with the same name</div>' : '';
+
+  el.innerHTML = `
+    <div class="card-top">
+      <span class="time">${hhmm(startDate(s))}</span>
+      <span class="name">${s.a}</span>${flag}
+    </div>
+    ${genre}${note}${warn}
+    <div class="listen"></div>
+    <div class="player"></div>
+    <div class="vote"><span class="sect">rate</span></div>`;
+
+  const acts = el.querySelector('.listen');
+  const vote = el.querySelector('.vote');
+  const player = el.querySelector('.player');
+
+  if (!s.talk && !L.no_links) {
+    acts.innerHTML = '<span class="sect">listen</span>';
+    if (L.spotify_artist_id || L.youtube_video_id) {
+      const b = document.createElement('button');
+      b.textContent = '▶ Listen';
+      b.onclick = () => {
+        if (player.innerHTML) { player.innerHTML = ''; b.textContent = '▶ Listen'; return; }
+        b.textContent = '✕ Close';
+        player.innerHTML = L.spotify_artist_id
+          ? `<iframe height="152" loading="lazy" allow="encrypted-media"
+               src="https://open.spotify.com/embed/artist/${L.spotify_artist_id}"></iframe>`
+          : `<iframe height="180" loading="lazy" allowfullscreen
+               src="https://www.youtube-nocookie.com/embed/${L.youtube_video_id}"></iframe>`;
+      };
+      acts.appendChild(b);
+    }
+    for (const [label, url] of outLinks(s.a, L)) {
+      const a = document.createElement('a');
+      a.href = url; a.target = '_blank'; a.rel = 'noopener'; a.textContent = label;
+      acts.appendChild(a);
+    }
+  }
+
+  for (const { v, label } of LEVELS) {
+    const b = document.createElement('button');
+    b.textContent = label;
+    if (pick === v) b.className = 'on';
+    b.onclick = () => {
+      if (PICKS[k] === v) delete PICKS[k]; else PICKS[k] = v;
+      savePicks(); render();
+    };
+    vote.appendChild(b);
+  }
+  return el;
+}
+
+function renderBrowse() {
+  const main = document.getElementById('main');
+  const mode = document.getElementById('filter').value;
+  const withEmbed = SETS.filter(s => {
+    const L = LINKS[s.a] || {};
+    return !s.talk && (L.spotify_artist_id || L.youtube_video_id);
+  }).length;
+  const music = SETS.filter(s => !s.talk && !(LINKS[s.a] || {}).no_links).length;
+  main.innerHTML = `<div class="legend">Hit <b>▶ Listen</b> to audition without leaving the page
+    (${withEmbed} of ${music} acts have a verified player; the rest are DJs and new bands with no releases —
+    use their search links). Rate each act — your picks feed the plan and are saved in this browser.</div>`;
+
+  for (const st of STAGES) {
+    let sets = SETS.filter(s => s.day === curDay && s.stage === st.id);
+    if (mode === 'picked') sets = sets.filter(s => PICKS[key(s)] >= threshold);
+    if (mode === 'unheard') sets = sets.filter(s => PICKS[key(s)] === undefined);
+    if (!sets.length) continue;
+    sets.sort((a, b) => startDate(a) - startDate(b));
+
+    const g = document.createElement('div');
+    g.className = 'stage-group';
+    g.innerHTML = `<div class="stage-head"><span class="dot" style="background:${st.color}"></span>${st.name}</div>`;
+    const grid = document.createElement('div');
+    grid.className = 'grid';
+    sets.forEach(s => grid.appendChild(renderCard(s)));
+    g.appendChild(grid);
+    main.appendChild(g);
+  }
+  if (!main.querySelector('.stage-group')) main.innerHTML += '<div class="empty">Nothing matches that filter.</div>';
+}
+
+// Chosen sets for a day, in time order, with walking legs and clashes worked out.
+function itinerary(day) {
+  const picked = SETS.filter(s => s.day === day && PICKS[key(s)] >= threshold)
+                     .sort((a, b) => startDate(a) - startDate(b));
+  const rows = [];
+  let prev = null;
+  for (const s of picked) {
+    if (prev) {
+      const gap = (startDate(s) - endDate(prev)) / 60000;
+      if (startDate(s) < endDate(prev)) {
+        const overlap = Math.round((endDate(prev) - startDate(s)) / 60000);
+        const rPrev = PICKS[key(prev)], rCur = PICKS[key(s)];
+        // With a rating scale the clash usually answers itself — say which one wins.
+        let verdict;
+        if (prev.stage === s.stage) verdict = 'same stage, just stay put';
+        else if (rCur > rPrev) verdict = `${s.a} is rated higher (${labelOf(rCur)} vs ${labelOf(rPrev)}) — leave ${prev.a} early, ${WALK_MINUTES} min walk`;
+        else if (rPrev > rCur) verdict = `${prev.a} is rated higher (${labelOf(rPrev)} vs ${labelOf(rCur)}) — stay put, join ${s.a} ~${overlap + WALK_MINUTES} min late`;
+        else verdict = `both rated ${labelOf(rCur)} — your call`;
+        rows.push({ kind: 'clash', text: `overlaps ${prev.a} by ${overlap} min — ${verdict}` });
+      } else if (prev.stage !== s.stage) {
+        rows.push({ kind: 'walk', text: `walk to ${stageById[s.stage].name} — ${WALK_MINUTES} min` +
+          (gap > WALK_MINUTES + 5 ? `, ${Math.round(gap)} min spare` : '') });
+      } else if (gap > 5) {
+        rows.push({ kind: 'walk', text: `stay at ${stageById[s.stage].name} — ${Math.round(gap)} min break` });
+      }
+    }
+    rows.push({ kind: 'set', s });
+    prev = s;
+  }
+  return rows;
+}
+
+function renderPlan() {
+  const main = document.getElementById('main');
+  main.innerHTML = `<div class="legend">Your itinerary, built from every act rated
+    <b>${labelOf(threshold)}</b> or better (change that in the bar above).
+    Stages are ~${WALK_MINUTES} min apart; sets are assumed to run ${SET_MINUTES} min.
+    Where two picks overlap, the higher rating breaks the tie.</div>`;
+  for (const d of DAYS) {
+    const rows = itinerary(d.id);
+    const sec = document.createElement('div');
+    sec.className = 'stage-group';
+    sec.innerHTML = `<div class="stage-head">${d.label} &middot; ${d.date}</div>`;
+    if (!rows.length) {
+      sec.innerHTML += '<div class="empty">No picks yet for this day.</div>';
+    } else {
+      const t = document.createElement('table');
+      t.className = 'plan';
+      t.innerHTML = '<tr><th>Time</th><th>Act</th><th>Stage</th></tr>';
+      for (const r of rows) {
+        const tr = document.createElement('tr');
+        if (r.kind === 'set') {
+          const st = stageById[r.s.stage];
+          tr.innerHTML = `<td class="time">${hhmm(startDate(r.s))}–${hhmm(endDate(r.s))}</td>
+            <td><b>${r.s.a}</b> <span class="flag">${labelOf(PICKS[key(r.s)])}</span></td>
+            <td><span class="dot" style="background:${st.color};display:inline-block"></span> ${st.name}</td>`;
+        } else {
+          tr.className = r.kind;
+          tr.innerHTML = `<td></td><td colspan="2">↳ ${r.text}</td>`;
+        }
+        t.appendChild(tr);
+      }
+      sec.appendChild(t);
+    }
+    main.appendChild(sec);
+  }
+}
+
+function exportICS() {
+  const stamp = d => d.getFullYear() + String(d.getMonth() + 1).padStart(2, '0') + String(d.getDate()).padStart(2, '0')
+    + 'T' + String(d.getHours()).padStart(2, '0') + String(d.getMinutes()).padStart(2, '0') + '00';
+  const lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//fengaros-2026//EN', 'CALSCALE:GREGORIAN'];
+  let n = 0;
+  for (const s of SETS) {
+    const p = PICKS[key(s)];
+    if (!(p >= threshold)) continue;
+    lines.push('BEGIN:VEVENT',
+      `UID:fengaros26-${n++}@local`,
+      `DTSTART;TZID=Asia/Nicosia:${stamp(startDate(s))}`,
+      `DTEND;TZID=Asia/Nicosia:${stamp(endDate(s))}`,
+      `SUMMARY:${s.a}${p < 4 ? ` (${labelOf(p)})` : ''} — ${stageById[s.stage].name}`,
+      `LOCATION:${stageById[s.stage].name}, Fengaros Festival, Petrides Farm Park, Marki`,
+      'END:VEVENT');
+  }
+  lines.push('END:VCALENDAR');
+  const blob = new Blob([lines.join('\r\n')], { type: 'text/calendar' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'fengaros-2026.ics';
+  a.click();
+}
+
+function render() {
+  document.getElementById('daytabs').innerHTML = '';
+  for (const d of DAYS) {
+    const b = document.createElement('button');
+    b.textContent = `${d.label} ${d.date.split(' ')[0]}`;
+    if (curView === 'browse' && curDay === d.id) b.className = 'on';
+    b.onclick = () => { curDay = d.id; curView = 'browse'; render(); };
+    document.getElementById('daytabs').appendChild(b);
+  }
+  document.getElementById('planbtn').className = curView === 'plan' ? 'on' : '';
+  curView === 'plan' ? renderPlan() : renderBrowse();
+}
+
+document.getElementById('planbtn').onclick = () => { curView = curView === 'plan' ? 'browse' : 'plan'; render(); };
+document.getElementById('filter').onchange = () => { curView = 'browse'; render(); };
+document.getElementById('threshold').value = String(threshold);
+document.getElementById('threshold').onchange = e => {
+  threshold = +e.target.value;
+  localStorage.setItem('fengaros26_thr', threshold);
+  render();
+};
+document.getElementById('icsbtn').onclick = exportICS;
+document.getElementById('resetbtn').onclick = () => {
+  if (confirm('Clear all your ratings?')) { for (const k in PICKS) delete PICKS[k]; savePicks(); render(); }
+};
+render();
+</script>
+</body>
+</html>
