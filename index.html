@@ -75,6 +75,14 @@
   tr.walk td { color: var(--dim); font-size: 12.5px; font-style: italic; }
   tr.clash td { color: #ff8080; font-size: 12.5px; }
   .empty { color: var(--dim); padding: 30px 0; }
+  .stagetag { font-size: 10.5px; font-weight: 600; color: #241f10; border-radius: 4px;
+              padding: 2px 7px; white-space: nowrap; }
+  .shared-note { background: #1d2733; border: 1px solid #35506b; border-left: 4px solid var(--accent);
+                 border-radius: 8px; padding: 12px 14px; color: var(--fg); }
+  .shared-actions { display: flex; flex-wrap: wrap; gap: 10px; margin: 0 0 24px; }
+  .shared-actions button { padding: 9px 15px; }
+  .shared-actions button:first-child { background: var(--accent); color: #241f10;
+                                       border-color: var(--accent); font-weight: 600; }
   .legend { color: var(--dim); font-size: 12.5px; margin-bottom: 16px; max-width: 780px; }
 </style>
 </head>
@@ -92,9 +100,13 @@
   <span class="by">Vibe-coded by <a href="https://linkedin.com/in/prodoelmit" target="_blank" rel="noopener">prodoelmit</a>.</span>
 </div>
 
-<div class="bar">
+<div class="bar" id="bar">
   <span id="daytabs"></span>
   <span class="spacer"></span>
+  <select id="layout">
+    <option value="stage">grouped by stage</option>
+    <option value="time">ordered by time</option>
+  </select>
   <select id="filter">
     <option value="all">Show all</option>
     <option value="picked">Only acts in my plan</option>
@@ -102,11 +114,11 @@
   </select>
   <label class="thr">plan includes score &ge;
     <select id="threshold">
-      <option value="5">5 — must see</option>
-      <option value="4" selected>4 — probably yes</option>
-      <option value="3">3 — curious</option>
-      <option value="2">2 — indifferent</option>
       <option value="1">1 — probably no</option>
+      <option value="2">2 — indifferent</option>
+      <option value="3">3 — curious</option>
+      <option value="4" selected>4 — probably yes</option>
+      <option value="5">5 — must see</option>
     </select>
   </label>
   <button id="sharebtn">Share my choices</button>
@@ -121,7 +133,7 @@
 <script>
 // Score 0-5, higher is keener. Buttons show the bare number; these names back
 // the tooltips and the legend. Higher score wins when two sets clash.
-const LEVELS = [5, 4, 3, 2, 1, 0];
+const LEVELS = [0, 1, 2, 3, 4, 5];
 const NAMES = { 5: 'must see', 4: 'probably yes', 3: 'curious', 2: 'indifferent', 1: 'probably no', 0: 'no' };
 const nameOf = v => NAMES[v] || '';
 
@@ -133,6 +145,11 @@ for (const k in PICKS) {
   // Second scale was numeric 0-4; stretch it onto 0-5 keeping the ordering.
   else if (SCALE_V !== '0-5') PICKS[k] = { 0: 0, 1: 1, 2: 3, 3: 4, 4: 5 }[PICKS[k]] ?? PICKS[k];
 }
+// Earlier keys embedded the start time (day|HHMM|artist); drop that middle part.
+for (const k of Object.keys(PICKS)) {
+  const p = k.split('|');
+  if (p.length === 3) { PICKS[`${p[0]}|${p[2]}`] = PICKS[k]; delete PICKS[k]; }
+}
 localStorage.setItem('fengaros26_scale', '0-5');
 const savePicks = () => localStorage.setItem('fengaros26', JSON.stringify(PICKS));
 
@@ -142,7 +159,9 @@ if (SCALE_V !== '0-5') threshold = { 0: 0, 1: 1, 2: 3, 3: 4, 4: 5 }[threshold] ?
 
 const stageById = Object.fromEntries(STAGES.map(s => [s.id, s]));
 const dayById = Object.fromEntries(DAYS.map(d => [d.id, d]));
-const key = s => `${s.day}|${s.t}|${s.a}`;
+// Keyed by day + artist, deliberately NOT by start time or stage: the festival can
+// shuffle a set to another slot without orphaning your score for it.
+const key = s => `${s.day}|${s.a}`;
 
 // A set listed at e.g. 0020 on Thursday actually happens early Friday morning.
 function startDate(s) {
@@ -156,6 +175,10 @@ const endDate = s => new Date(startDate(s).getTime() + SET_MINUTES * 60000);
 const hhmm = dt => String(dt.getHours()).padStart(2, '0') + ':' + String(dt.getMinutes()).padStart(2, '0');
 
 let curDay = 'thu', curView = 'browse';
+// Non-null while viewing someone else's link; read-only, never written to PICKS.
+let shared = null;
+// 'stage' = grouped per stage, 'time' = one timeline with stage tags.
+let layout = localStorage.getItem('fengaros26_layout') || 'stage';
 
 const MOBILE = typeof navigator !== 'undefined' && /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
 
@@ -190,7 +213,7 @@ function outLinks(name, L) {
   return links;
 }
 
-function renderCard(s) {
+function renderCard(s, showStage) {
   const L = LINKS[s.a] || {};
   const k = key(s), pick = PICKS[k];
   const st = stageById[s.stage];
@@ -199,6 +222,8 @@ function renderCard(s) {
   el.style.borderLeftColor = st.color;
 
   const flag = s.c ? `<span class="flag">${s.c}</span>` : '';
+  const tag = showStage
+    ? `<span class="stagetag" style="background:${st.color}">${st.name}</span>` : '';
   const genre = L.genre ? `<div class="genre">${L.genre}</div>` : (s.talk ? '<div class="genre">talk / comedy</div>' : '');
   const note = L.note ? `<div class="note">${L.note}</div>` : '';
   const warn = L.confidence === 'low' ? '<div class="lowconf">link may be a different act with the same name</div>' : '';
@@ -206,7 +231,7 @@ function renderCard(s) {
   el.innerHTML = `
     <div class="card-top">
       <span class="time">${hhmm(startDate(s))}</span>
-      <span class="name">${s.a}</span>${flag}
+      <span class="name">${s.a}</span>${flag}${tag}
     </div>
     ${genre}${note}${warn}
     <div class="listen"></div>
@@ -268,28 +293,47 @@ function renderBrowse() {
     (${withEmbed} of ${music} acts have a verified player; the rest are DJs and new bands with no releases —
     use their search links). Rate each act — your picks feed the plan and are saved in this browser.</div>`;
 
-  for (const st of STAGES) {
-    let sets = SETS.filter(s => s.day === curDay && s.stage === st.id);
-    if (mode === 'picked') sets = sets.filter(s => PICKS[key(s)] >= threshold);
-    if (mode === 'unheard') sets = sets.filter(s => PICKS[key(s)] === undefined);
-    if (!sets.length) continue;
-    sets.sort((a, b) => startDate(a) - startDate(b));
+  const visible = list => {
+    if (mode === 'picked') return list.filter(s => PICKS[key(s)] >= threshold);
+    if (mode === 'unheard') return list.filter(s => PICKS[key(s)] === undefined);
+    return list;
+  };
 
-    const g = document.createElement('div');
-    g.className = 'stage-group';
-    g.innerHTML = `<div class="stage-head"><span class="dot" style="background:${st.color}"></span>${st.name}</div>`;
-    const grid = document.createElement('div');
-    grid.className = 'grid';
-    sets.forEach(s => grid.appendChild(renderCard(s)));
-    g.appendChild(grid);
-    main.appendChild(g);
+  if (layout === 'time') {
+    const sets = visible(SETS.filter(s => s.day === curDay))
+                   .sort((a, b) => startDate(a) - startDate(b));
+    if (sets.length) {
+      const g = document.createElement('div');
+      g.className = 'stage-group';
+      const grid = document.createElement('div');
+      grid.className = 'grid';
+      sets.forEach(s => grid.appendChild(renderCard(s, true)));
+      g.appendChild(grid);
+      main.appendChild(g);
+    }
+  } else {
+    for (const st of STAGES) {
+      const sets = visible(SETS.filter(s => s.day === curDay && s.stage === st.id))
+                     .sort((a, b) => startDate(a) - startDate(b));
+      if (!sets.length) continue;
+      const g = document.createElement('div');
+      g.className = 'stage-group';
+      g.innerHTML = `<div class="stage-head"><span class="dot" style="background:${st.color}"></span>${st.name}</div>`;
+      const grid = document.createElement('div');
+      grid.className = 'grid';
+      sets.forEach(s => grid.appendChild(renderCard(s)));
+      g.appendChild(grid);
+      main.appendChild(g);
+    }
   }
   if (!main.querySelector('.stage-group')) main.innerHTML += '<div class="empty">Nothing matches that filter.</div>';
 }
 
 // Chosen sets for a day, in time order, with walking legs and clashes worked out.
-function itinerary(day) {
-  const picked = SETS.filter(s => s.day === day && PICKS[key(s)] >= threshold)
+function itinerary(day, scores, thr) {
+  scores = scores || PICKS;
+  thr = thr === undefined ? threshold : thr;
+  const picked = SETS.filter(s => s.day === day && scores[key(s)] >= thr)
                      .sort((a, b) => startDate(a) - startDate(b));
   const rows = [];
   let prev = null;
@@ -298,7 +342,7 @@ function itinerary(day) {
       const gap = (startDate(s) - endDate(prev)) / 60000;
       if (startDate(s) < endDate(prev)) {
         const overlap = Math.round((endDate(prev) - startDate(s)) / 60000);
-        const rPrev = PICKS[key(prev)], rCur = PICKS[key(s)];
+        const rPrev = scores[key(prev)], rCur = scores[key(s)];
         // With a rating scale the clash usually answers itself — say which one wins.
         let verdict;
         if (prev.stage === s.stage) verdict = 'same stage, just stay put';
@@ -319,19 +363,16 @@ function itinerary(day) {
   return rows;
 }
 
-function renderPlan() {
-  const main = document.getElementById('main');
-  main.innerHTML = `<div class="legend">Your itinerary, built from every act rated
-    <b>${threshold}</b> (${nameOf(threshold)}) or higher — change that in the bar above.
-    Stages are ~${WALK_MINUTES} min apart; sets are assumed to run ${SET_MINUTES} min.
-    Where two picks overlap, the higher rating breaks the tie.</div>`;
+// Day-by-day plan sections, appended to `host`. Used for both your own plan
+// and the read-only view of someone else's link.
+function planSections(host, scores, thr, emptyMsg) {
   for (const d of DAYS) {
-    const rows = itinerary(d.id);
+    const rows = itinerary(d.id, scores, thr);
     const sec = document.createElement('div');
     sec.className = 'stage-group';
     sec.innerHTML = `<div class="stage-head">${d.label} &middot; ${d.date}</div>`;
     if (!rows.length) {
-      sec.innerHTML += '<div class="empty">No picks yet for this day.</div>';
+      sec.innerHTML += `<div class="empty">${emptyMsg}</div>`;
     } else {
       const t = document.createElement('table');
       t.className = 'plan';
@@ -340,8 +381,9 @@ function renderPlan() {
         const tr = document.createElement('tr');
         if (r.kind === 'set') {
           const st = stageById[r.s.stage];
+          const v = scores[key(r.s)];
           tr.innerHTML = `<td class="time">${hhmm(startDate(r.s))}–${hhmm(endDate(r.s))}</td>
-            <td><b>${r.s.a}</b> <span class="flag" title="${nameOf(PICKS[key(r.s)])}">${PICKS[key(r.s)]}</span></td>
+            <td><b>${r.s.a}</b> <span class="flag" title="${nameOf(v)}">${v}</span></td>
             <td><span class="dot" style="background:${st.color};display:inline-block"></span> ${st.name}</td>`;
         } else {
           tr.className = r.kind;
@@ -351,8 +393,63 @@ function renderPlan() {
       }
       sec.appendChild(t);
     }
-    main.appendChild(sec);
+    host.appendChild(sec);
   }
+}
+
+function renderPlan() {
+  const main = document.getElementById('main');
+  main.innerHTML = `<div class="legend">Your itinerary, built from every act scored
+    <b>${threshold}</b> (${nameOf(threshold)}) or higher — change that in the bar above.
+    Stages are ~${WALK_MINUTES} min apart; sets are assumed to run ${SET_MINUTES} min.
+    Where two picks overlap, the higher score breaks the tie.</div>`;
+  planSections(main, PICKS, threshold, 'Nothing scored that high for this day.');
+}
+
+// Read-only view of a shared link. Deliberately never touches PICKS.
+function renderShared() {
+  const main = document.getElementById('main');
+  const { scores, threshold: thr, total, dropped } = shared;
+  const matched = Object.keys(scores).length;
+  const drop = dropped.length
+    ? `<br><b>${dropped.length}</b> scored act${dropped.length > 1 ? 's are' : ' is'} no longer
+       in the lineup and could not be matched: ${dropped.join(', ')}.`
+    : '';
+  main.innerHTML = `<div class="legend shared-note">
+    You are viewing <b>someone else's choices</b>, read-only — your own scores are untouched.
+    ${matched} of ${total} scored acts matched the current lineup, shown at their
+    threshold of <b>${thr}</b> (${nameOf(thr)}).${drop}</div>`;
+
+  const bar = document.createElement('div');
+  bar.className = 'shared-actions';
+  const adopt = document.createElement('button');
+  adopt.textContent = 'Start from these choices — this will override my previous ratings';
+  adopt.onclick = () => {
+    const mine = Object.keys(PICKS).length;
+    if (mine && !confirm(`Replace your ${mine} scored act${mine > 1 ? 's' : ''} with these ${matched}?\n\nThis cannot be undone.`)) return;
+    for (const k in PICKS) delete PICKS[k];
+    Object.assign(PICKS, scores);
+    threshold = thr;
+    savePicks();
+    localStorage.setItem('fengaros26_thr', threshold);
+    exitShared();
+  };
+  const back = document.createElement('button');
+  back.textContent = 'Back to my own plan';
+  back.onclick = exitShared;
+  bar.append(adopt, back);
+  main.appendChild(bar);
+
+  planSections(main, scores, thr, 'Nothing scored that high for this day.');
+}
+
+function exitShared() {
+  shared = null;
+  if (typeof history !== 'undefined' && history.replaceState) {
+    history.replaceState(null, '', location.pathname + location.search);
+  } else { location.hash = ''; }
+  curView = 'browse';
+  render();
 }
 
 function exportICS() {
@@ -380,44 +477,88 @@ function exportICS() {
 }
 
 // --- Sharing -------------------------------------------------------------
-// One character per set, in SETS order: '0'-'5' for a score, '.' for unrated.
-// Positional, so the v1 tag must bump if SETS is ever reordered or added to.
-const SHARE_RE = /^#!v1\.(\d)\.([0-5.]+)$/;
+// Payload is newline-separated text, base64url'd into the fragment:
+//   line 1  format version
+//   line 2  threshold
+//   rest    "day|ARTIST=score", one per scored act
+// Only scored acts appear, so the link grows with how much you've actually rated.
+// Newline is the separator because an artist name contains a semicolon
+// (SOCKS;SPORTSSOCKS) and another contains '&'.
+const SHARE_V = '2';
 
-function encodeState() {
-  const digits = SETS.map(s => {
-    const v = PICKS[key(s)];
-    return v === undefined ? '.' : String(v);
-  }).join('');
-  return `#!v1.${threshold}.${digits}`;
+function b64e(str) {
+  const bytes = new TextEncoder().encode(str);
+  let bin = '';
+  bytes.forEach(b => { bin += String.fromCharCode(b); });
+  return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+function b64d(b64) {
+  const bin = atob(b64.replace(/-/g, '+').replace(/_/g, '/'));
+  return new TextDecoder().decode(Uint8Array.from(bin, c => c.charCodeAt(0)));
 }
 
-function applyShared(hash) {
-  const m = SHARE_RE.exec(hash);
-  if (!m) return false;
-  const [, thr, digits] = m;
-  if (digits.length !== SETS.length) return false;   // built against a different lineup
-  const incoming = {};
-  SETS.forEach((s, i) => {
-    if (digits[i] !== '.') incoming[key(s)] = +digits[i];
-  });
-  const mine = Object.keys(PICKS).length;
-  if (mine && !confirm(`Load ${Object.keys(incoming).length} shared scores?\n\nThis replaces your own ${mine}.`)) return false;
-  for (const k in PICKS) delete PICKS[k];
-  Object.assign(PICKS, incoming);
-  threshold = +thr;
-  savePicks();
-  localStorage.setItem('fengaros26_thr', threshold);
-  return true;
+function encodeState() {
+  const lines = [SHARE_V, String(threshold)];
+  for (const s of SETS) {
+    const v = PICKS[key(s)];
+    if (v !== undefined) lines.push(`${key(s)}=${v}`);
+  }
+  return '#!s=' + b64e(lines.join('\n'));
+}
+
+// Resolve a shared payload against the CURRENT lineup, by artist rather than by
+// position, so a reshuffled or partially-changed schedule keeps the scores it can.
+function decodeShared(hash) {
+  const m = /^#!s=([A-Za-z0-9\-_]+)$/.exec(hash || '');
+  if (!m) return null;
+  let text;
+  try { text = b64d(m[1]); } catch (e) { return null; }
+
+  const lines = text.split('\n');
+  if (lines[0] !== SHARE_V) return null;
+  const thr = +lines[1];
+  if (!(thr >= 0 && thr <= 5)) return null;
+
+  const byKey = new Map(), byArtist = new Map();
+  for (const line of lines.slice(2)) {
+    const i = line.lastIndexOf('=');
+    if (i < 1) continue;
+    const k = line.slice(0, i), v = +line.slice(i + 1);
+    if (!(v >= 0 && v <= 5)) continue;
+    byKey.set(k, v);
+    const artist = k.slice(k.indexOf('|') + 1);
+    byArtist.set(artist, byArtist.has(artist) ? null : v);  // null marks "ambiguous"
+  }
+  if (!byKey.size) return null;
+
+  // How many times each artist appears in today's lineup — only fall back to a
+  // name-only match when it is unambiguous on both sides.
+  const counts = {};
+  for (const s of SETS) counts[s.a] = (counts[s.a] || 0) + 1;
+
+  const scores = {};
+  const used = new Set();
+  for (const s of SETS) {
+    const k = key(s);
+    if (byKey.has(k)) { scores[k] = byKey.get(k); used.add(k); continue; }
+    const v = byArtist.get(s.a);
+    if (v != null && counts[s.a] === 1) {          // moved to another day
+      scores[k] = v;
+      for (const pk of byKey.keys()) if (pk.slice(pk.indexOf('|') + 1) === s.a) used.add(pk);
+    }
+  }
+  const dropped = [...byKey.keys()].filter(k => !used.has(k))
+                                   .map(k => k.slice(k.indexOf('|') + 1));
+  return { scores, threshold: thr, total: byKey.size, dropped };
 }
 
 function shareChoices() {
   const rated = Object.keys(PICKS).length;
-  if (!rated) { alert('Nothing scored yet — rate a few acts first.'); return; }
+  if (!rated) { alert('Nothing scored yet — score a few acts first.'); return; }
   const url = location.origin + location.pathname + encodeState();
+  const b = document.getElementById('sharebtn');
   const done = () => {
-    const b = document.getElementById('sharebtn');
-    b.textContent = `Link copied (${rated} scored)`;
+    b.textContent = `Link copied (${rated} acts)`;
     setTimeout(() => { b.textContent = 'Share my choices'; }, 2500);
   };
   if (navigator.clipboard && navigator.clipboard.writeText) {
@@ -428,6 +569,10 @@ function shareChoices() {
 }
 
 function render() {
+  // A shared link takes over the whole page: no controls, nothing writable.
+  document.getElementById('bar').style.display = shared ? 'none' : '';
+  if (shared) { renderShared(); return; }
+
   document.getElementById('daytabs').innerHTML = '';
   for (const d of DAYS) {
     const b = document.createElement('button');
@@ -438,6 +583,7 @@ function render() {
   }
   document.getElementById('planbtn').className = curView === 'plan' ? 'on' : '';
   document.getElementById('threshold').value = String(threshold);
+  document.getElementById('layout').value = layout;
   curView === 'plan' ? renderPlan() : renderBrowse();
 }
 
@@ -451,8 +597,15 @@ document.getElementById('threshold').onchange = e => {
 document.getElementById('icsbtn').onclick = exportICS;
 document.getElementById('sharebtn').onclick = shareChoices;
 
-// A shared link wins over whatever this browser had stored.
-if (typeof location !== 'undefined' && location.hash) applyShared(location.hash);
+document.getElementById('layout').onchange = e => {
+  layout = e.target.value;
+  localStorage.setItem('fengaros26_layout', layout);
+  curView = 'browse';
+  render();
+};
+
+// A shared link opens read-only; it never overwrites what this browser has stored.
+if (typeof location !== 'undefined' && location.hash) shared = decodeShared(location.hash);
 document.getElementById('resetbtn').onclick = () => {
   if (confirm('Clear all your ratings?')) { for (const k in PICKS) delete PICKS[k]; savePicks(); render(); }
 };
