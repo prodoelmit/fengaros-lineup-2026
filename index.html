@@ -77,6 +77,8 @@
   .empty { color: var(--dim); padding: 30px 0; }
   .stagetag { font-size: 10.5px; font-weight: 600; color: #241f10; border-radius: 4px;
               padding: 2px 7px; white-space: nowrap; }
+  .scorebadge { font-size: 12px; font-weight: 600; color: var(--accent);
+                border: 1px solid var(--line); border-radius: 6px; padding: 4px 9px; }
   .shared-note { background: #1d2733; border: 1px solid #35506b; border-left: 4px solid var(--accent);
                  border-radius: 8px; padding: 12px 14px; color: var(--fg); }
   .shared-actions { display: flex; flex-wrap: wrap; gap: 10px; margin: 0 0 24px; }
@@ -213,9 +215,11 @@ function outLinks(name, L) {
   return links;
 }
 
-function renderCard(s, showStage) {
+// sharedScore set => score is somebody else's: shown as a static badge, still listenable.
+function renderCard(s, showStage, sharedScore) {
+  const readOnly = sharedScore !== undefined;
   const L = LINKS[s.a] || {};
-  const k = key(s), pick = PICKS[k];
+  const k = key(s), pick = readOnly ? sharedScore : PICKS[k];
   const st = stageById[s.stage];
   const el = document.createElement('div');
   el.className = 'card' + (pick === undefined ? '' : ' r' + pick);
@@ -236,7 +240,7 @@ function renderCard(s, showStage) {
     ${genre}${note}${warn}
     <div class="listen"></div>
     <div class="player"></div>
-    <div class="vote"><span class="sect" title="5 = must see, 0 = no">score</span></div>`;
+    <div class="vote"><span class="sect" title="5 = must see, 0 = no">${readOnly ? 'their score' : 'score'}</span></div>`;
 
   const acts = el.querySelector('.listen');
   const vote = el.querySelector('.vote');
@@ -267,16 +271,23 @@ function renderCard(s, showStage) {
     }
   }
 
-  for (const v of LEVELS) {
-    const b = document.createElement('button');
-    b.textContent = String(v);
-    b.title = `${v} — ${nameOf(v)}`;
-    b.className = 'num' + (pick === v ? ' on' : '');
-    b.onclick = () => {
-      if (PICKS[k] === v) delete PICKS[k]; else PICKS[k] = v;
-      savePicks(); render();
-    };
-    vote.appendChild(b);
+  if (readOnly) {
+    const badge = document.createElement('span');
+    badge.className = 'scorebadge';
+    badge.textContent = `${sharedScore} — ${nameOf(sharedScore)}`;
+    vote.appendChild(badge);
+  } else {
+    for (const v of LEVELS) {
+      const b = document.createElement('button');
+      b.textContent = String(v);
+      b.title = `${v} — ${nameOf(v)}`;
+      b.className = 'num' + (pick === v ? ' on' : '');
+      b.onclick = () => {
+        if (PICKS[k] === v) delete PICKS[k]; else PICKS[k] = v;
+        savePicks(); render();
+      };
+      vote.appendChild(b);
+    }
   }
   return el;
 }
@@ -441,6 +452,22 @@ function renderShared() {
   main.appendChild(bar);
 
   planSections(main, scores, thr, 'Nothing scored that high for this day.');
+
+  // Everything they scored, best first, still fully listenable.
+  const rated = SETS.filter(s => scores[key(s)] !== undefined)
+    .sort((a, b) => scores[key(b)] - scores[key(a)] || startDate(a) - startDate(b));
+  if (rated.length) {
+    const g = document.createElement('div');
+    g.className = 'stage-group';
+    g.innerHTML = `<div class="stage-head">Listen to their picks</div>
+      <div class="legend">All ${rated.length} acts they scored, highest first — including
+      the ones below their threshold that did not make the plan above.</div>`;
+    const grid = document.createElement('div');
+    grid.className = 'grid';
+    rated.forEach(s => grid.appendChild(renderCard(s, true, scores[key(s)])));
+    g.appendChild(grid);
+    main.appendChild(g);
+  }
 }
 
 function exitShared() {
