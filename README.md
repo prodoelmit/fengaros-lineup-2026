@@ -18,15 +18,21 @@ lineup: listen to every act, rate them, and get a stage-by-stage itinerary out t
 - **Audition the lineup.** Each act has an inline Spotify or YouTube player where a verified
   one exists, plus YouTube / Spotify / Bandcamp search links for everyone else. Roughly half
   the bill is DJs and first-release bands with no streaming presence, so the gaps are expected.
-- **Rate on a 5-point scale** — must see, probably yes, indifferent, probably no, no.
-  Ratings live in `localStorage`; nothing leaves the browser.
+- **Score each act 0–5** (5 = must see, 0 = no). Scores live in `localStorage`;
+  nothing is sent anywhere.
+- **Share a plan.** "Share my choices" packs every score into the URL fragment —
+  one character per set, so the link is self-contained and needs no backend.
+  Opening someone's link offers to load their scores over yours.
 - **Get an itinerary.** Picks become a time-ordered plan per day, with walking legs inserted
   between stage changes and overlaps flagged. Where two picks collide the higher rating breaks
   the tie and the plan says which way to go.
 - **Export to calendar** as `.ics`.
 
-The "plan includes" selector sets how generous the plan is — rate freely while listening,
-then tighten the threshold if the result is overstuffed.
+The "plan includes score ≥" selector sets how generous the plan is — score freely while
+listening, then raise the threshold if the result is overstuffed.
+
+On phones, Spotify and YouTube links hand off to the native apps via their custom URL
+schemes rather than opening the mobile web players.
 
 ## Running it
 

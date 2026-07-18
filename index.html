@@ -60,8 +60,10 @@
       border: 1px solid var(--line); background: var(--panel2); color: var(--dim);
       text-decoration: none; cursor: pointer; }
   .listen a:hover, .listen button:hover, .vote button:hover { color: var(--fg); border-color: var(--accent); }
+  .vote button.num { min-width: 30px; text-align: center; font-variant-numeric: tabular-nums;
+                     font-size: 13px; padding: 4px 0; }
   /* Must out-specify `.vote button` above, or the highlight silently loses. */
-  .vote button.on { background: var(--accent); color: #241f10; border-color: var(--accent); font-weight: 600; }
+  .vote button.on { background: var(--accent); color: #241f10; border-color: var(--accent); font-weight: 700; }
   .player { margin-top: 10px; }
   .player iframe { width: 100%; border: 0; border-radius: 8px; display: block; }
 
@@ -98,14 +100,16 @@
     <option value="picked">Only acts in my plan</option>
     <option value="unheard">Not yet rated</option>
   </select>
-  <label class="thr">plan includes
+  <label class="thr">plan includes score &ge;
     <select id="threshold">
-      <option value="4">must see</option>
-      <option value="3" selected>probably yes &amp; up</option>
-      <option value="2">indifferent &amp; up</option>
-      <option value="1">probably no &amp; up</option>
+      <option value="5">5 — must see</option>
+      <option value="4" selected>4 — probably yes</option>
+      <option value="3">3 — curious</option>
+      <option value="2">2 — indifferent</option>
+      <option value="1">1 — probably no</option>
     </select>
   </label>
+  <button id="sharebtn">Share my choices</button>
   <button id="planbtn">My plan</button>
   <button id="icsbtn">Export .ics</button>
   <button id="resetbtn">Reset picks</button>
@@ -115,25 +119,26 @@
 
 <script src="schedule.js"></script>
 <script>
-// 4 = must see … 0 = no. Higher wins when two sets clash.
-const LEVELS = [
-  { v: 4, label: '★★ Must see',    short: 'must see' },
-  { v: 3, label: '★ Probably yes', short: 'probably yes' },
-  { v: 2, label: '~ Indifferent',  short: 'indifferent' },
-  { v: 1, label: '· Probably no',  short: 'probably no' },
-  { v: 0, label: '✕ No',           short: 'no' },
-];
-const labelOf = v => (LEVELS.find(l => l.v === v) || {}).short || '';
+// Score 0-5, higher is keener. Buttons show the bare number; these names back
+// the tooltips and the legend. Higher score wins when two sets clash.
+const LEVELS = [5, 4, 3, 2, 1, 0];
+const NAMES = { 5: 'must see', 4: 'probably yes', 3: 'curious', 2: 'indifferent', 1: 'probably no', 0: 'no' };
+const nameOf = v => NAMES[v] || '';
 
 const PICKS = JSON.parse(localStorage.getItem('fengaros26') || '{}');
-// Migrate the original 3-point scale (yes/maybe/no strings) onto the 0-4 scale.
+const SCALE_V = localStorage.getItem('fengaros26_scale');
 for (const k in PICKS) {
-  if (typeof PICKS[k] === 'string') PICKS[k] = { yes: 4, maybe: 2, no: 0 }[PICKS[k]] ?? 2;
+  // Original 3-point scale stored strings.
+  if (typeof PICKS[k] === 'string') PICKS[k] = { yes: 5, maybe: 3, no: 0 }[PICKS[k]] ?? 3;
+  // Second scale was numeric 0-4; stretch it onto 0-5 keeping the ordering.
+  else if (SCALE_V !== '0-5') PICKS[k] = { 0: 0, 1: 1, 2: 3, 3: 4, 4: 5 }[PICKS[k]] ?? PICKS[k];
 }
+localStorage.setItem('fengaros26_scale', '0-5');
 const savePicks = () => localStorage.setItem('fengaros26', JSON.stringify(PICKS));
 
-// Only sets rated at or above this go in the plan.
-let threshold = +(localStorage.getItem('fengaros26_thr') ?? 3);
+// Only sets scored at or above this go in the plan.
+let threshold = +(localStorage.getItem('fengaros26_thr') ?? 4);
+if (SCALE_V !== '0-5') threshold = { 0: 0, 1: 1, 2: 3, 3: 4, 4: 5 }[threshold] ?? 4;
 
 const stageById = Object.fromEntries(STAGES.map(s => [s.id, s]));
 const dayById = Object.fromEntries(DAYS.map(d => [d.id, d]));
@@ -152,17 +157,35 @@ const hhmm = dt => String(dt.getHours()).padStart(2, '0') + ':' + String(dt.getM
 
 let curDay = 'thu', curView = 'browse';
 
+const MOBILE = typeof navigator !== 'undefined' && /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+
 // One link per platform: straight to the artist where we have them, a search otherwise.
+// On phones we hand over custom schemes so the native apps take the tap instead of the
+// mobile web player. Desktop keeps plain https.
 function outLinks(name, L) {
   const n = encodeURIComponent(name), q = encodeURIComponent(name + ' music');
-  const links = [
-    ['Spotify ↗', L.spotify_artist_id
-      ? `https://open.spotify.com/artist/${L.spotify_artist_id}`
-      : `https://open.spotify.com/search/${n}`],
-    ['YouTube ↗', L.youtube_video_id ? `https://youtu.be/${L.youtube_video_id}`
-      : L.youtube_channel || `https://www.youtube.com/results?search_query=${q}`],
-    ['Bandcamp ↗', L.bandcamp_url || `https://bandcamp.com/search?q=${n}`],
-  ];
+
+  let spotify;
+  if (L.spotify_artist_id) {
+    spotify = MOBILE ? `spotify:artist:${L.spotify_artist_id}`
+                     : `https://open.spotify.com/artist/${L.spotify_artist_id}`;
+  } else {
+    spotify = MOBILE ? `spotify:search:${n}` : `https://open.spotify.com/search/${n}`;
+  }
+
+  let youtube;
+  if (L.youtube_video_id) {
+    youtube = MOBILE ? `youtube://watch?v=${L.youtube_video_id}`
+                     : `https://youtu.be/${L.youtube_video_id}`;
+  } else if (L.youtube_channel) {
+    youtube = L.youtube_channel;
+  } else {
+    youtube = MOBILE ? `youtube://results?search_query=${q}`
+                     : `https://www.youtube.com/results?search_query=${q}`;
+  }
+
+  const links = [['Spotify ↗', spotify], ['YouTube ↗', youtube],
+                 ['Bandcamp ↗', L.bandcamp_url || `https://bandcamp.com/search?q=${n}`]];
   if (L.homepage) links.push(['Bio ↗', L.homepage]);
   return links;
 }
@@ -188,7 +211,7 @@ function renderCard(s) {
     ${genre}${note}${warn}
     <div class="listen"></div>
     <div class="player"></div>
-    <div class="vote"><span class="sect">rate</span></div>`;
+    <div class="vote"><span class="sect" title="5 = must see, 0 = no">score</span></div>`;
 
   const acts = el.querySelector('.listen');
   const vote = el.querySelector('.vote');
@@ -212,15 +235,18 @@ function renderCard(s) {
     }
     for (const [label, url] of outLinks(s.a, L)) {
       const a = document.createElement('a');
-      a.href = url; a.target = '_blank'; a.rel = 'noopener'; a.textContent = label;
+      a.href = url; a.textContent = label;
+      // App-scheme links must stay in the same tab, or the handoff leaves a blank one behind.
+      if (/^https?:/.test(url)) { a.target = '_blank'; a.rel = 'noopener'; }
       acts.appendChild(a);
     }
   }
 
-  for (const { v, label } of LEVELS) {
+  for (const v of LEVELS) {
     const b = document.createElement('button');
-    b.textContent = label;
-    if (pick === v) b.className = 'on';
+    b.textContent = String(v);
+    b.title = `${v} — ${nameOf(v)}`;
+    b.className = 'num' + (pick === v ? ' on' : '');
     b.onclick = () => {
       if (PICKS[k] === v) delete PICKS[k]; else PICKS[k] = v;
       savePicks(); render();
@@ -276,9 +302,9 @@ function itinerary(day) {
         // With a rating scale the clash usually answers itself — say which one wins.
         let verdict;
         if (prev.stage === s.stage) verdict = 'same stage, just stay put';
-        else if (rCur > rPrev) verdict = `${s.a} is rated higher (${labelOf(rCur)} vs ${labelOf(rPrev)}) — leave ${prev.a} early, ${WALK_MINUTES} min walk`;
-        else if (rPrev > rCur) verdict = `${prev.a} is rated higher (${labelOf(rPrev)} vs ${labelOf(rCur)}) — stay put, join ${s.a} ~${overlap + WALK_MINUTES} min late`;
-        else verdict = `both rated ${labelOf(rCur)} — your call`;
+        else if (rCur > rPrev) verdict = `${s.a} scores higher (${rCur} vs ${rPrev}) — leave ${prev.a} early, ${WALK_MINUTES} min walk`;
+        else if (rPrev > rCur) verdict = `${prev.a} scores higher (${rPrev} vs ${rCur}) — stay put, join ${s.a} ~${overlap + WALK_MINUTES} min late`;
+        else verdict = `both score ${rCur} — your call`;
         rows.push({ kind: 'clash', text: `overlaps ${prev.a} by ${overlap} min — ${verdict}` });
       } else if (prev.stage !== s.stage) {
         rows.push({ kind: 'walk', text: `walk to ${stageById[s.stage].name} — ${WALK_MINUTES} min` +
@@ -296,7 +322,7 @@ function itinerary(day) {
 function renderPlan() {
   const main = document.getElementById('main');
   main.innerHTML = `<div class="legend">Your itinerary, built from every act rated
-    <b>${labelOf(threshold)}</b> or better (change that in the bar above).
+    <b>${threshold}</b> (${nameOf(threshold)}) or higher — change that in the bar above.
     Stages are ~${WALK_MINUTES} min apart; sets are assumed to run ${SET_MINUTES} min.
     Where two picks overlap, the higher rating breaks the tie.</div>`;
   for (const d of DAYS) {
@@ -315,7 +341,7 @@ function renderPlan() {
         if (r.kind === 'set') {
           const st = stageById[r.s.stage];
           tr.innerHTML = `<td class="time">${hhmm(startDate(r.s))}–${hhmm(endDate(r.s))}</td>
-            <td><b>${r.s.a}</b> <span class="flag">${labelOf(PICKS[key(r.s)])}</span></td>
+            <td><b>${r.s.a}</b> <span class="flag" title="${nameOf(PICKS[key(r.s)])}">${PICKS[key(r.s)]}</span></td>
             <td><span class="dot" style="background:${st.color};display:inline-block"></span> ${st.name}</td>`;
         } else {
           tr.className = r.kind;
@@ -341,7 +367,7 @@ function exportICS() {
       `UID:fengaros26-${n++}@local`,
       `DTSTART;TZID=Asia/Nicosia:${stamp(startDate(s))}`,
       `DTEND;TZID=Asia/Nicosia:${stamp(endDate(s))}`,
-      `SUMMARY:${s.a}${p < 4 ? ` (${labelOf(p)})` : ''} — ${stageById[s.stage].name}`,
+      `SUMMARY:${s.a}${p < 5 ? ` (${p}/5)` : ''} — ${stageById[s.stage].name}`,
       `LOCATION:${stageById[s.stage].name}, Fengaros Festival, Petrides Farm Park, Marki`,
       'END:VEVENT');
   }
@@ -351,6 +377,54 @@ function exportICS() {
   a.href = URL.createObjectURL(blob);
   a.download = 'fengaros-2026.ics';
   a.click();
+}
+
+// --- Sharing -------------------------------------------------------------
+// One character per set, in SETS order: '0'-'5' for a score, '.' for unrated.
+// Positional, so the v1 tag must bump if SETS is ever reordered or added to.
+const SHARE_RE = /^#!v1\.(\d)\.([0-5.]+)$/;
+
+function encodeState() {
+  const digits = SETS.map(s => {
+    const v = PICKS[key(s)];
+    return v === undefined ? '.' : String(v);
+  }).join('');
+  return `#!v1.${threshold}.${digits}`;
+}
+
+function applyShared(hash) {
+  const m = SHARE_RE.exec(hash);
+  if (!m) return false;
+  const [, thr, digits] = m;
+  if (digits.length !== SETS.length) return false;   // built against a different lineup
+  const incoming = {};
+  SETS.forEach((s, i) => {
+    if (digits[i] !== '.') incoming[key(s)] = +digits[i];
+  });
+  const mine = Object.keys(PICKS).length;
+  if (mine && !confirm(`Load ${Object.keys(incoming).length} shared scores?\n\nThis replaces your own ${mine}.`)) return false;
+  for (const k in PICKS) delete PICKS[k];
+  Object.assign(PICKS, incoming);
+  threshold = +thr;
+  savePicks();
+  localStorage.setItem('fengaros26_thr', threshold);
+  return true;
+}
+
+function shareChoices() {
+  const rated = Object.keys(PICKS).length;
+  if (!rated) { alert('Nothing scored yet — rate a few acts first.'); return; }
+  const url = location.origin + location.pathname + encodeState();
+  const done = () => {
+    const b = document.getElementById('sharebtn');
+    b.textContent = `Link copied (${rated} scored)`;
+    setTimeout(() => { b.textContent = 'Share my choices'; }, 2500);
+  };
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(url).then(done, () => prompt('Copy this link:', url));
+  } else {
+    prompt('Copy this link:', url);
+  }
 }
 
 function render() {
@@ -363,18 +437,22 @@ function render() {
     document.getElementById('daytabs').appendChild(b);
   }
   document.getElementById('planbtn').className = curView === 'plan' ? 'on' : '';
+  document.getElementById('threshold').value = String(threshold);
   curView === 'plan' ? renderPlan() : renderBrowse();
 }
 
 document.getElementById('planbtn').onclick = () => { curView = curView === 'plan' ? 'browse' : 'plan'; render(); };
 document.getElementById('filter').onchange = () => { curView = 'browse'; render(); };
-document.getElementById('threshold').value = String(threshold);
 document.getElementById('threshold').onchange = e => {
   threshold = +e.target.value;
   localStorage.setItem('fengaros26_thr', threshold);
   render();
 };
 document.getElementById('icsbtn').onclick = exportICS;
+document.getElementById('sharebtn').onclick = shareChoices;
+
+// A shared link wins over whatever this browser had stored.
+if (typeof location !== 'undefined' && location.hash) applyShared(location.hash);
 document.getElementById('resetbtn').onclick = () => {
   if (confirm('Clear all your ratings?')) { for (const k in PICKS) delete PICKS[k]; savePicks(); render(); }
 };
