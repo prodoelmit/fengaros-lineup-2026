@@ -296,17 +296,31 @@ function renderCard(s, showStage, sharedScore) {
     badge.textContent = `${sharedScore} — ${nameOf(sharedScore)}`;
     vote.appendChild(badge);
   } else {
+    const numButtons = [];
+    // Repaint just this card's highlight and button states, so scoring an act
+    // doesn't tear down the DOM (and any open Listen player) via a full render.
+    const applyPick = () => {
+      const cur = PICKS[k];
+      el.className = 'card' + (cur === undefined ? '' : ' r' + cur);
+      numButtons.forEach((b, i) => b.classList.toggle('on', LEVELS[i] === cur));
+    };
     for (const v of LEVELS) {
       const b = document.createElement('button');
       b.textContent = String(v);
       b.title = `${v} — ${nameOf(v)}`;
-      b.className = 'num' + (pick === v ? ' on' : '');
+      b.className = 'num';
       b.onclick = () => {
         if (PICKS[k] === v) delete PICKS[k]; else PICKS[k] = v;
-        savePicks(); render();
+        savePicks();
+        // A score-based filter needs a rebuild so cards can appear/disappear;
+        // the default "show all" updates in place and keeps the player alive.
+        if (document.getElementById('filter').value === 'all') applyPick();
+        else render();
       };
+      numButtons.push(b);
       vote.appendChild(b);
     }
+    applyPick();
   }
   return el;
 }
